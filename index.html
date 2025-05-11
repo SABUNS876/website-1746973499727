@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>DeepSeek AI Search</title>
+<style>
+  /* Reset */
+  * {
+    box-sizing: border-box;
+  }
+  body, html {
+    margin: 0; padding: 0; height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #121212;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 1rem;
+    min-height: 100vh;
+  }
+  h1 {
+    margin-bottom: 0.2rem;
+    font-weight: 800;
+    font-size: 2rem;
+    color:#00d8ff;
+    text-align: center;
+  }
+  p.subtitle {
+    margin-top: 0; margin-bottom: 1.5rem;
+    color: #66e0ffcc;
+    font-weight: 400;
+    font-size: 1rem;
+    text-align: center;
+  }
+  form {
+    display: flex;
+    width: 100%;
+    max-width: 400px;
+  }
+  input[type="text"] {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    font-size: 1rem;
+    border-radius: 4px 0 0 4px;
+    border: none;
+    outline: none;
+  }
+  button {
+    background: #00d8ff;
+    border: none;
+    padding: 0 1.3rem;
+    font-size: 1rem;
+    color: #121212;
+    font-weight: bold;
+    cursor: pointer;
+    border-radius: 0 4px 4px 0;
+    transition: background-color 0.3s ease;
+  }
+  button:hover:not(:disabled) {
+    background-color: #00a4cc;
+  }
+  button:disabled {
+    background-color: #005f71;
+    cursor: not-allowed;
+  }
+  #results {
+    margin-top: 1.5rem;
+    width: 100%;
+    max-width: 400px;
+  }
+  .result-item {
+    background: #222;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 0 6px #00d8ff33;
+  }
+  .result-item h2 {
+    margin: 0 0 0.4rem 0;
+    font-size: 1.2rem;
+    color: #00d8ff;
+    word-break: break-word;
+  }
+  .result-item p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: #ccc;
+  }
+  #error-message {
+    margin-top: 1rem;
+    color: #ff5555;
+    font-weight: 600;
+    text-align: center;
+  }
+  @media (max-width: 400px) {
+    body {
+      padding: 0.5rem;
+    }
+    form {
+      flex-direction: column;
+    }
+    input[type="text"], button {
+      width: 100%;
+      border-radius: 6px;
+    }
+    button {
+      margin-top: 0.8rem;
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>DeepSeek AI Search</h1>
+  <p class="subtitle">Enter your query and get AI-generated search results powered by DeepSeek</p>
+  <form id="search-form">
+    <input type="text" id="query-input" placeholder="Ask something..." autocomplete="off" required />
+    <button type="submit" id="search-btn">Search</button>
+  </form>
+  <div id="error-message" role="alert" aria-live="assertive"></div>
+  <div id="results" aria-live="polite"></div>
+
+<script>
+(() => {
+  const apiKey = 'sk-ea08cb0292314562a4a9e40bfbcf6c52';
+  const form = document.getElementById('search-form');
+  const input = document.getElementById('query-input');
+  const resultsContainer = document.getElementById('results');
+  const errorMessage = document.getElementById('error-message');
+  const searchBtn = document.getElementById('search-btn');
+
+  function clearResults() {
+    resultsContainer.innerHTML = '';
+    errorMessage.textContent = '';
+  }
+
+  function showError(message) {
+    errorMessage.textContent = message;
+  }
+
+  function createResultItem(title, description) {
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    const h2 = document.createElement('h2');
+    h2.textContent = title;
+    const p = document.createElement('p');
+    p.textContent = description;
+    item.appendChild(h2);
+    item.appendChild(p);
+    return item;
+  }
+
+  async function queryDeepSeekAI(query) {
+    // DeepSeek API endpoint and format assumed based on typical structure.
+    // Using fetch to send POST request with the query and API key in headers.
+    const endpoint = 'https://api.deepseek.com/v1/generate'; // Assumed endpoint based on naming
+
+    // The body format is assumed; if DeepSeek actually expects a different payload, this may need adaption.
+    const bodyPayload = {
+      prompt: query,
+      max_tokens: 150,
+      temperature: 0.7
+    };
+
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(bodyPayload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+
+      // Assume the data returned is:
+      // { result: [{ title: string, description: string }, ...] }
+      // or { text: string } if single answer.
+
+      if (data.result && Array.isArray(data.result)) {
+        return data.result;
+      }
+      else if (data.text) {
+        return [{ title: "Answer", description: data.text }];
+      }
+
+      throw new Error('Unexpected API response format');
+    } catch (err) {
+      throw new Error('Failed to fetch from DeepSeek API: ' + err.message);
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearResults();
+
+    const query = input.value.trim();
+    if (!query) return;
+
+    searchBtn.disabled = true;
+    searchBtn.textContent = 'Searching...';
+
+    try {
+      const results = await queryDeepSeekAI(query);
+      if (results.length === 0) {
+        showError('No results found.');
+      } else {
+        results.forEach(item => {
+          resultsContainer.appendChild(createResultItem(item.title, item.description));
+        });
+      }
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      searchBtn.disabled = false;
+      searchBtn.textContent = 'Search';
+    }
+  });
+})();
+</script>
+</body>
+</html>
+
+```
